@@ -4,6 +4,28 @@ TEMP_NODE_NAME = "__mbaker_target__"
 TEMP_UV_NODE_NAME = "__mbaker_source_uv__"
 
 
+def collect_armatures(objects):
+    """Return {armature_obj: original_pose_position} for all armatures driving the given meshes."""
+    armatures = {}
+    for obj in objects:
+        for mod in obj.modifiers:
+            if mod.type == "ARMATURE" and mod.object is not None:
+                arm = mod.object
+                if arm not in armatures:
+                    armatures[arm] = arm.data.pose_position
+    return armatures
+
+
+def set_rest_pose(armatures):
+    for arm in armatures:
+        arm.data.pose_position = "REST"
+
+
+def restore_pose_positions(armatures):
+    for arm, pose_position in armatures.items():
+        arm.data.pose_position = pose_position
+
+
 def ensure_material(obj):
     if not obj.data.materials:
         mat = bpy.data.materials.new(name=f"_mbaker_default_{obj.name}")
@@ -50,9 +72,19 @@ _NODES_WITH_VECTOR_INPUT = {
 }
 
 
+def _unique_image_name(base_name):
+    if base_name not in bpy.data.images:
+        return base_name
+    index = 1
+    while True:
+        candidate = f"{base_name}.{index:03d}"
+        if candidate not in bpy.data.images:
+            return candidate
+        index += 1
+
+
 def create_image(name, resolution, is_data=False, background_color=(0.0, 0.0, 0.0)):
-    if name in bpy.data.images:
-        bpy.data.images.remove(bpy.data.images[name])
+    name = _unique_image_name(name)
 
     img = bpy.data.images.new(
         name, resolution, resolution, alpha=False, float_buffer=False
@@ -74,8 +106,7 @@ def create_image(name, resolution, is_data=False, background_color=(0.0, 0.0, 0.
 
 
 def create_normal_image(name, resolution):
-    if name in bpy.data.images:
-        bpy.data.images.remove(bpy.data.images[name])
+    name = _unique_image_name(name)
 
     img = bpy.data.images.new(
         name, resolution, resolution, alpha=False, float_buffer=False

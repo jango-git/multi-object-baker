@@ -47,6 +47,7 @@ class MBAKER_PT_panel(bpy.types.Panel):
         box.prop(props, "samples")
         box.prop(props, "margin")
         box.prop(props, "background_color")
+        box.prop(props, "force_rest_pose")
 
         layout.separator()
         row = layout.row(align=True)
@@ -55,6 +56,25 @@ class MBAKER_PT_panel(bpy.types.Panel):
 
         row = layout.row(align=True)
         row.operator("mbaker.cleanup", icon="TRASH")
+        row.prop(props, "auto_cleanup", text="", icon="FILE_REFRESH", toggle=True)
 
         sel_count = sum(1 for o in context.selected_objects if o.type == "MESH")
         layout.label(text=f"Selected meshes: {sel_count}", icon="INFO")
+
+        if sel_count >= 2:
+            scales = []
+            for o in context.selected_objects:
+                if o.type == "MESH":
+                    s = o.scale
+                    scales.append((abs(s.x) + abs(s.y) + abs(s.z)) / 3.0)
+
+            min_s = min(scales)
+            max_s = max(scales)
+            if min_s > 1e-6 and max_s / min_s > 1.05:
+                box = layout.box()
+                box.label(text="Inconsistent scale!", icon="ERROR")
+                col = box.column(align=True)
+                col.use_property_split = False
+                col.scale_y = 0.8
+                col.label(text="UV islands may bake at wrong size.")
+                col.label(text="Apply scale first: Ctrl+A → Scale")

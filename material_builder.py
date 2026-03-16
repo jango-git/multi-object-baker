@@ -10,8 +10,19 @@ PASS_TO_INPUT = {
 }
 
 
+def _unique_material_name(base_name):
+    if base_name not in bpy.data.materials:
+        return base_name
+    index = 1
+    while True:
+        candidate = f"{base_name}.{index:03d}"
+        if candidate not in bpy.data.materials:
+            return candidate
+        index += 1
+
+
 def build_result_material(name, uv_map_name, images):
-    mat = bpy.data.materials.new(name=name)
+    mat = bpy.data.materials.new(name=_unique_material_name(name))
     mat.use_nodes = True
     tree = mat.node_tree
     tree.nodes.clear()

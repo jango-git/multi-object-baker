@@ -2,6 +2,7 @@ import bpy
 
 from .bake_utils import (
     cleanup_nodes,
+    collect_armatures,
     create_image,
     create_normal_image,
     do_bake,
@@ -9,7 +10,9 @@ from .bake_utils import (
     inject_bake_target,
     pin_source_uvs,
     restore_metallic_swap,
+    restore_pose_positions,
     set_active_uv,
+    set_rest_pose,
     swap_metallic_to_emission,
     unpin_source_uvs,
 )
@@ -83,45 +86,51 @@ class MBAKER_OT_bake(bpy.types.Operator):
         baked_images = {}
         background_color = tuple(props.background_color)
 
-        for key, bake_type, is_data in passes_to_bake:
-            img_name = f"{props.texture_name}_{key}"
+        armatures = collect_armatures(objects) if props.force_rest_pose else {}
+        set_rest_pose(armatures)
 
-            if key == "normal":
-                img = create_normal_image(img_name, resolution)
-            else:
-                img = create_image(
-                    img_name,
-                    resolution,
-                    is_data=is_data,
-                    background_color=background_color,
-                )
+        try:
+            for key, bake_type, is_data in passes_to_bake:
+                img_name = f"{props.texture_name}_{key}"
 
-            nodes = inject_bake_target(objects, img)
-
-            try:
-                if bake_type == "_METALLIC":
-                    rewire = swap_metallic_to_emission(objects)
-                    cleanup_nodes(nodes)
-                    nodes = inject_bake_target(objects, img)
-                    try:
-                        do_bake(context, "EMIT")
-                    finally:
-                        restore_metallic_swap(rewire)
-                elif bake_type == "DIFFUSE":
-                    do_bake(context, bake_type, use_color_only=True)
+                if key == "normal":
+                    img = create_normal_image(img_name, resolution)
                 else:
-                    do_bake(context, bake_type)
-            except RuntimeError as error:
-                self.report({"ERROR"}, f"Bake failed for {key}: {error}")
-                cleanup_nodes(nodes)
-                unpin_source_uvs(pinned_uvs)
-                context.scene.render.engine = original_engine
-                context.scene.cycles.samples = original_samples
-                return {"CANCELLED"}
+                    img = create_image(
+                        img_name,
+                        resolution,
+                        is_data=is_data,
+                        background_color=background_color,
+                    )
 
-            cleanup_nodes(nodes)
-            baked_images[key] = img
-            self.report({"INFO"}, f"Baked: {key}")
+                nodes = inject_bake_target(objects, img)
+
+                try:
+                    if bake_type == "_METALLIC":
+                        rewire = swap_metallic_to_emission(objects)
+                        cleanup_nodes(nodes)
+                        nodes = inject_bake_target(objects, img)
+                        try:
+                            do_bake(context, "EMIT")
+                        finally:
+                            restore_metallic_swap(rewire)
+                    elif bake_type == "DIFFUSE":
+                        do_bake(context, bake_type, use_color_only=True)
+                    else:
+                        do_bake(context, bake_type)
+                except RuntimeError as error:
+                    self.report({"ERROR"}, f"Bake failed for {key}: {error}")
+                    cleanup_nodes(nodes)
+                    unpin_source_uvs(pinned_uvs)
+                    context.scene.render.engine = original_engine
+                    context.scene.cycles.samples = original_samples
+                    return {"CANCELLED"}
+
+                cleanup_nodes(nodes)
+                baked_images[key] = img
+                self.report({"INFO"}, f"Baked: {key}")
+        finally:
+            restore_pose_positions(armatures)
 
         unpin_source_uvs(pinned_uvs)
 
@@ -134,10 +143,19 @@ class MBAKER_OT_bake(bpy.types.Operator):
         context.scene.render.engine = original_engine
         context.scene.cycles.samples = original_samples
 
-        self.report(
-            {"INFO"},
-            f"Done — created material '{mat_name}' with {len(baked_images)} maps. Use Cleanup to assign it.",
-        )
+        props.last_baked_material = new_mat.name
+
+        if props.auto_cleanup:
+            bpy.ops.mbaker.cleanup()
+            self.report(
+                {"INFO"},
+                f"Done — baked and cleaned up. Material '{new_mat.name}' assigned.",
+            )
+        else:
+            self.report(
+                {"INFO"},
+                f"Done — created material '{new_mat.name}' with {len(baked_images)} maps. Use Cleanup to assign it.",
+            )
         return {"FINISHED"}
 
 
@@ -224,7 +242,7 @@ class MBAKER_OT_cleanup(bpy.types.Operator):
     def execute(self, context):
         props = context.scene.mbaker_props
         uv_name = props.uv_map_name
-        mat_name = props.material_name
+        mat_name = props.last_baked_material or props.material_name
         objects = [o for o in context.selected_objects if o.type == "MESH"]
 
         if not objects:

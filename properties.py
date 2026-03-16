@@ -57,6 +57,25 @@ class MBAKER_Properties(bpy.types.PropertyGroup):
     bake_emit: BoolProperty(name="Emission", default=False)
     bake_ao: BoolProperty(name="AO", default=False)
 
+    last_baked_material: StringProperty(
+        name="Last Baked Material",
+        description="Internal: name of the last successfully baked material",
+        default="",
+        options={"HIDDEN"},
+    )
+
+    force_rest_pose: BoolProperty(
+        name="Rest Pose",
+        description="Temporarily set armatures to rest pose during baking to avoid deformation artifacts",
+        default=True,
+    )
+
+    auto_cleanup: BoolProperty(
+        name="Auto Cleanup",
+        description="Automatically run Cleanup after baking",
+        default=False,
+    )
+
     background_color: FloatVectorProperty(
         name="Background",
         description="Background fill color for baked textures",
