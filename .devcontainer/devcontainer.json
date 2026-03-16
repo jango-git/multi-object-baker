@@ -1,0 +1,5 @@
+{
+    "name": "multi-object-baker",
+    "image": "mcr.microsoft.com/devcontainers/python:3.11",
+    "postCreateCommand": "pip install fake-bpy-module-latest --break-system-packages"
+}

@@ -1,0 +1,13 @@
+{
+    "extraPaths": ["/home/vscode/.local/lib/python3.11/site-packages"],
+    "pythonVersion": "3.11",
+    "typeCheckingMode": "basic",
+
+    "reportAttributeAccessIssue": "warning",
+    "reportOptionalMemberAccess": "warning",
+    "reportArgumentType": "warning",
+    "reportAssignmentType": "warning",
+
+    "reportOperatorIssue": "none",
+    "reportIndexIssue": "none"
+}
